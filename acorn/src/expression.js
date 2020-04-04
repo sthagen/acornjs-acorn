@@ -262,7 +262,8 @@ pp.parseExprSubscripts = function(refDestructuringErrors) {
 
 pp.parseSubscripts = function(base, startPos, startLoc, noCalls) {
   let maybeAsyncArrow = this.options.ecmaVersion >= 8 && base.type === "Identifier" && base.name === "async" &&
-      this.lastTokEnd === base.end && !this.canInsertSemicolon() && this.input.slice(base.start, base.end) === "async"
+      this.lastTokEnd === base.end && !this.canInsertSemicolon() && base.end - base.start === 5 &&
+      this.potentialArrowAt === base.start
   while (true) {
     let element = this.parseSubscript(base, startPos, startLoc, noCalls, maybeAsyncArrow)
     if (element === base || element.type === "ArrowFunctionExpression") return element
@@ -426,10 +427,18 @@ pp.parseExprAtom = function(refDestructuringErrors) {
 
 pp.parseExprImport = function() {
   const node = this.startNode()
-  this.next() // skip `import`
+
+  // Consume `import` as an identifier for `import.meta`.
+  // Because `this.parseIdent(true)` doesn't check escape sequences, it needs the check of `this.containsEsc`.
+  if (this.containsEsc) this.raiseRecoverable(this.start, "Escape sequence in keyword import")
+  const meta = this.parseIdent(true)
+
   switch (this.type) {
   case tt.parenL:
     return this.parseDynamicImport(node)
+  case tt.dot:
+    node.meta = meta
+    return this.parseImportMeta(node)
   default:
     this.unexpected()
   }
@@ -452,6 +461,22 @@ pp.parseDynamicImport = function(node) {
   }
 
   return this.finishNode(node, "ImportExpression")
+}
+
+pp.parseImportMeta = function(node) {
+  this.next() // skip `.`
+
+  const containsEsc = this.containsEsc
+  node.property = this.parseIdent(true)
+
+  if (node.property.name !== "meta")
+    this.raiseRecoverable(node.property.start, "The only valid meta property for import is 'import.meta'")
+  if (containsEsc)
+    this.raiseRecoverable(node.start, "'import.meta' must not contain escaped characters")
+  if (this.options.sourceType !== "module")
+    this.raiseRecoverable(node.start, "Cannot use 'import.meta' outside a module")
+
+  return this.finishNode(node, "MetaProperty")
 }
 
 pp.parseLiteral = function(value) {
@@ -556,10 +581,12 @@ pp.parseNew = function() {
     node.meta = meta
     let containsEsc = this.containsEsc
     node.property = this.parseIdent(true)
-    if (node.property.name !== "target" || containsEsc)
-      this.raiseRecoverable(node.property.start, "The only valid meta property for new is new.target")
+    if (node.property.name !== "target")
+      this.raiseRecoverable(node.property.start, "The only valid meta property for new is 'new.target'")
+    if (containsEsc)
+      this.raiseRecoverable(node.start, "'new.target' must not contain escaped characters")
     if (!this.inNonArrowFunction())
-      this.raiseRecoverable(node.start, "new.target can only be used in functions")
+      this.raiseRecoverable(node.start, "'new.target' can only be used in functions")
     return this.finishNode(node, "MetaProperty")
   }
   let startPos = this.start, startLoc = this.startLoc, isImport = this.type === tt._import
