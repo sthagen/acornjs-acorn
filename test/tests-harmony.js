@@ -13124,7 +13124,7 @@ testFail("for (var x = 42 of list) process(x);", "for-of loop variable declarati
 testFail("for (var x = 42 of list) process(x);", "for-of loop variable declaration may not have an initializer (1:5)", {ecmaVersion: 8});
 testFail("for (var {x} = 42 of list) process(x);", "for-of loop variable declaration may not have an initializer (1:5)", {ecmaVersion: 6});
 testFail("for (var [x] = 42 of list) process(x);", "for-of loop variable declaration may not have an initializer (1:5)", {ecmaVersion: 6});
-testFail("var x; for (x = 42 of list) process(x);", "Invalid left-hand side in for-loop (1:12)", {ecmaVersion: 6});
+testFail("var x; for (x = 42 of list) process(x);", "Assigning to rvalue (1:12)", {ecmaVersion: 6});
 
 testFail("import foo", "Unexpected token (1:10)", {ecmaVersion: 6, sourceType: "module"});
 
@@ -16520,3 +16520,55 @@ test("({ __proto__: x, __proto__: y, __proto__: z }) => {}", {}, {ecmaVersion: 6
 // Don't parse first token after a class or strict function as strict
 test("class x {}\n05", {}, {ecmaVersion: 6})
 test("function x() { 'use strict' }\n05", {}, {ecmaVersion: 6})
+
+test("const myFn = ({ set = '' }) => {};", {
+  "type": "Program",
+  "body": [
+    {
+      "type": "VariableDeclaration",
+      "declarations": [
+        {
+          "type": "VariableDeclarator",
+          "id": {
+            "type": "Identifier",
+            "name": "myFn"
+          },
+          "init": {
+            "type": "ArrowFunctionExpression",
+            "params": [
+              {
+                "type": "ObjectPattern",
+                "properties": [
+                  {
+                    "type": "Property",
+                    "key": {
+                      "type": "Identifier",
+                      "name": "set"
+                    },
+                    "kind": "init",
+                    "value": {
+                      "type": "AssignmentPattern",
+                      "left": {
+                        "type": "Identifier",
+                        "name": "set"
+                      },
+                      "right": {
+                        "type": "Literal",
+                        "value": ""
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "body": {
+              "type": "BlockStatement",
+              "body": []
+            }
+          }
+        }
+      ],
+      "kind": "const"
+    }
+  ]
+}, {ecmaVersion: 6})

@@ -1,5 +1,5 @@
-import {LooseParser} from "./state"
-import {isDummy} from "./parseutil"
+import {LooseParser} from "./state.js"
+import {isDummy} from "./parseutil.js"
 import {getLineInfo, tokTypes as tt} from "acorn"
 
 const lp = LooseParser.prototype
@@ -48,7 +48,7 @@ lp.parseStatement = function() {
 
   case tt._for:
     this.next() // `for` keyword
-    let isAwait = this.options.ecmaVersion >= 9 && this.inAsync && this.eatContextual("await")
+    let isAwait = this.options.ecmaVersion >= 9 && this.eatContextual("await")
 
     this.pushCx()
     this.expect(tt.parenL)

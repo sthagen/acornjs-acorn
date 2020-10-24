@@ -10,13 +10,10 @@ const unsupportedFeatures = [
   "class-static-fields-private",
   "class-static-fields-public",
   "class-static-methods-private",
-  "numeric-separator-literal",
-  "optional-chaining",
-  "top-level-await"
 ];
 
 run(
-  (content, {sourceType}) => parse(content, {sourceType, ecmaVersion: 11, allowHashBang: true}),
+  (content, {sourceType}) => parse(content, {sourceType, ecmaVersion: 12, allowHashBang: true, allowAwaitOutsideFunction: sourceType === "module"}),
   {
     testsDirectory: path.dirname(require.resolve("test262/package.json")),
     skip: test => (test.attrs.features && unsupportedFeatures.some(f => test.attrs.features.includes(f))),

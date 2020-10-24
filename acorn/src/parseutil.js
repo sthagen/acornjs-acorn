@@ -1,12 +1,12 @@
-import {types as tt} from "./tokentype"
-import {Parser} from "./state"
-import {lineBreak, skipWhiteSpace} from "./whitespace"
+import {types as tt} from "./tokentype.js"
+import {Parser} from "./state.js"
+import {lineBreak, skipWhiteSpace} from "./whitespace.js"
 
 const pp = Parser.prototype
 
 // ## Parser utilities
 
-const literal = /^(?:'((?:\\.|[^'])*?)'|"((?:\\.|[^"])*?)")/
+const literal = /^(?:'((?:\\.|[^'\\])*?)'|"((?:\\.|[^"\\])*?)")/
 pp.strictDirective = function(start) {
   for (;;) {
     // Try to find string literal.

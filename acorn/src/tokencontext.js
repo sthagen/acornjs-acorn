@@ -2,9 +2,9 @@
 // given point in the program is loosely based on sweet.js' approach.
 // See https://github.com/mozilla/sweet.js/wiki/design
 
-import {Parser} from "./state"
-import {types as tt} from "./tokentype"
-import {lineBreak} from "./whitespace"
+import {Parser} from "./state.js"
+import {types as tt} from "./tokentype.js"
+import {lineBreak} from "./whitespace.js"
 
 export class TokContext {
   constructor(token, isExpr, preserveSpace, override, generator) {
@@ -110,7 +110,8 @@ tt.incDec.updateContext = function() {
 }
 
 tt._function.updateContext = tt._class.updateContext = function(prevType) {
-  if (prevType.beforeExpr && prevType !== tt.semi && prevType !== tt._else &&
+  if (prevType.beforeExpr && prevType !== tt._else &&
+      !(prevType === tt.semi && this.curContext() !== types.p_stat) &&
       !(prevType === tt._return && lineBreak.test(this.input.slice(this.lastTokEnd, this.start))) &&
       !((prevType === tt.colon || prevType === tt.braceL) && this.curContext() === types.b_stat))
     this.context.push(types.f_expr)
