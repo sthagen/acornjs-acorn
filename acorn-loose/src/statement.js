@@ -281,48 +281,8 @@ lp.parseClass = function(isStatement) {
   this.eat(tt.braceL)
   if (this.curIndent + 1 < indent) { indent = this.curIndent; line = this.curLineStart }
   while (!this.closes(tt.braceR, indent, line)) {
-    if (this.semicolon()) continue
-    let method = this.startNode(), isGenerator, isAsync
-    if (this.options.ecmaVersion >= 6) {
-      method.static = false
-      isGenerator = this.eat(tt.star)
-    }
-    this.parsePropertyName(method)
-    if (isDummy(method.key)) { if (isDummy(this.parseMaybeAssign())) this.next(); this.eat(tt.comma); continue }
-    if (method.key.type === "Identifier" && !method.computed && method.key.name === "static" &&
-        (this.tok.type !== tt.parenL && this.tok.type !== tt.braceL)) {
-      method.static = true
-      isGenerator = this.eat(tt.star)
-      this.parsePropertyName(method)
-    } else {
-      method.static = false
-    }
-    if (!method.computed &&
-        method.key.type === "Identifier" && method.key.name === "async" && this.tok.type !== tt.parenL &&
-        !this.canInsertSemicolon()) {
-      isAsync = true
-      isGenerator = this.options.ecmaVersion >= 9 && this.eat(tt.star)
-      this.parsePropertyName(method)
-    } else {
-      isAsync = false
-    }
-    if (this.options.ecmaVersion >= 5 && method.key.type === "Identifier" &&
-        !method.computed && (method.key.name === "get" || method.key.name === "set") &&
-        this.tok.type !== tt.parenL && this.tok.type !== tt.braceL) {
-      method.kind = method.key.name
-      this.parsePropertyName(method)
-      method.value = this.parseMethod(false)
-    } else {
-      if (!method.computed && !method.static && !isGenerator && !isAsync && (
-        method.key.type === "Identifier" && method.key.name === "constructor" ||
-          method.key.type === "Literal" && method.key.value === "constructor")) {
-        method.kind = "constructor"
-      } else {
-        method.kind = "method"
-      }
-      method.value = this.parseMethod(isGenerator, isAsync)
-    }
-    node.body.body.push(this.finishNode(method, "MethodDefinition"))
+    const element = this.parseClassElement()
+    if (element) node.body.body.push(element)
   }
   this.popCx()
   if (!this.eat(tt.braceR)) {
@@ -336,8 +296,121 @@ lp.parseClass = function(isStatement) {
   return this.finishNode(node, isStatement ? "ClassDeclaration" : "ClassExpression")
 }
 
+lp.parseClassElement = function() {
+  if (this.eat(tt.semi)) return null
+
+  const {ecmaVersion, locations} = this.options
+  const indent = this.curIndent
+  const line = this.curLineStart
+  const node = this.startNode()
+  let keyName = ""
+  let isGenerator = false
+  let isAsync = false
+  let kind = "method"
+
+  // Parse modifiers
+  node.static = false
+  if (this.eatContextual("static")) {
+    if (this.isClassElementNameStart() || this.toks.type === tt.star) {
+      node.static = true
+    } else {
+      keyName = "static"
+    }
+  }
+  if (!keyName && ecmaVersion >= 8 && this.eatContextual("async")) {
+    if ((this.isClassElementNameStart() || this.toks.type === tt.star) && !this.canInsertSemicolon()) {
+      isAsync = true
+    } else {
+      keyName = "async"
+    }
+  }
+  if (!keyName) {
+    isGenerator = this.eat(tt.star)
+    const lastValue = this.toks.value
+    if (this.eatContextual("get") || this.eatContextual("set")) {
+      if (this.isClassElementNameStart()) {
+        kind = lastValue
+      } else {
+        keyName = lastValue
+      }
+    }
+  }
+
+  // Parse element name
+  if (keyName) {
+    // 'async', 'get', 'set', or 'static' were not a keyword contextually.
+    // The last token is any of those. Make it the element name.
+    node.computed = false
+    node.key = this.startNodeAt(locations ? [this.toks.lastTokStart, this.toks.lastTokStartLoc] : this.toks.lastTokStart)
+    node.key.name = keyName
+    this.finishNode(node.key, "Identifier")
+  } else {
+    this.parseClassElementName(node)
+
+    // From https://github.com/acornjs/acorn/blob/7deba41118d6384a2c498c61176b3cf434f69590/acorn-loose/src/statement.js#L291
+    // Skip broken stuff.
+    if (isDummy(node.key)) {
+      if (isDummy(this.parseMaybeAssign())) this.next()
+      this.eat(tt.comma)
+      return null
+    }
+  }
+
+  // Parse element value
+  if (ecmaVersion < 13 || this.toks.type === tt.parenL || kind !== "method" || isGenerator || isAsync) {
+    // Method
+    const isConstructor =
+      !node.computed &&
+      !node.static &&
+      !isGenerator &&
+      !isAsync &&
+      kind === "method" && (
+        node.key.type === "Identifier" && node.key.name === "constructor" ||
+        node.key.type === "Literal" && node.key.value === "constructor"
+      )
+    node.kind = isConstructor ? "constructor" : kind
+    node.value = this.parseMethod(isGenerator, isAsync)
+    this.finishNode(node, "MethodDefinition")
+  } else {
+    // Field
+    if (this.eat(tt.eq)) {
+      if (this.curLineStart !== line && this.curIndent <= indent && this.tokenStartsLine()) {
+        // Estimated the next line is the next class element by indentations.
+        node.value = null
+      } else {
+        const oldInAsync = this.inAsync
+        const oldInGenerator = this.inGenerator
+        this.inAsync = false
+        this.inGenerator = false
+        node.value = this.parseMaybeAssign()
+        this.inAsync = oldInAsync
+        this.inGenerator = oldInGenerator
+      }
+    } else {
+      node.value = null
+    }
+    this.semicolon()
+    this.finishNode(node, "PropertyDefinition")
+  }
+
+  return node
+}
+
+lp.isClassElementNameStart = function() {
+  return this.toks.isClassElementNameStart()
+}
+
+lp.parseClassElementName = function(element) {
+  if (this.toks.type === tt.privateId) {
+    element.computed = false
+    element.key = this.parsePrivateIdent()
+  } else {
+    this.parsePropertyName(element)
+  }
+}
+
 lp.parseFunction = function(node, isStatement, isAsync) {
-  let oldInAsync = this.inAsync, oldInFunction = this.inFunction
+  let oldInAsync = this.inAsync, oldInGenerator = this.inGenerator, oldInFunction = this.inFunction
   this.initFunction(node)
   if (this.options.ecmaVersion >= 6) {
     node.generator = this.eat(tt.star)
@@ -348,11 +421,13 @@ lp.parseFunction = function(node, isStatement, isAsync) {
   if (this.tok.type === tt.name) node.id = this.parseIdent()
   else if (isStatement === true) node.id = this.dummyIdent()
   this.inAsync = node.async
+  this.inGenerator = node.generator
   this.inFunction = true
   node.params = this.parseFunctionParams()
   node.body = this.parseBlock()
   this.toks.adaptDirectivePrologue(node.body.body)
   this.inAsync = oldInAsync
+  this.inGenerator = oldInGenerator
   this.inFunction = oldInFunction
   return this.finishNode(node, isStatement ? "FunctionDeclaration" : "FunctionExpression")
 }
