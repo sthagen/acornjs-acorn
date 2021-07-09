@@ -42,13 +42,14 @@ pp.isLet = function(context) {
   // Statement) is allowed here. If context is not empty then only a Statement
   // is allowed. However, `let [` is an explicit negative lookahead for
   // ExpressionStatement, so special-case it first.
-  if (nextCh === 91) return true // '['
+  if (nextCh === 91 || nextCh === 92 || nextCh > 0xd7ff && nextCh < 0xdc00) return true // '[', '/', astral
   if (context) return false
 
   if (nextCh === 123) return true // '{'
   if (isIdentifierStart(nextCh, true)) {
     let pos = next + 1
-    while (isIdentifierChar(this.input.charCodeAt(pos), true)) ++pos
+    while (isIdentifierChar(nextCh = this.input.charCodeAt(pos), true)) ++pos
+    if (nextCh === 92 || nextCh > 0xd7ff && nextCh < 0xdc00) return true
     let ident = this.input.slice(next, pos)
     if (!keywordRelationalOperator.test(ident)) return true
   }
@@ -64,10 +65,11 @@ pp.isAsyncFunction = function() {
 
   skipWhiteSpace.lastIndex = this.pos
   let skip = skipWhiteSpace.exec(this.input)
-  let next = this.pos + skip[0].length
+  let next = this.pos + skip[0].length, after
   return !lineBreak.test(this.input.slice(this.pos, next)) &&
     this.input.slice(next, next + 8) === "function" &&
-    (next + 8 === this.input.length || !isIdentifierChar(this.input.charAt(next + 8)))
+    (next + 8 === this.input.length ||
+     !(isIdentifierChar(after = this.input.charCodeAt(next + 8)) || after > 0xd7ff && after < 0xdc00))
 }
 
 // Parse a single statement.
@@ -207,7 +209,7 @@ pp.parseDoStatement = function(node) {
 
 pp.parseForStatement = function(node) {
   this.next()
-  let awaitAt = (this.options.ecmaVersion >= 9 && (this.inAsync || (!this.inFunction && this.options.allowAwaitOutsideFunction)) && this.eatContextual("await")) ? this.lastTokStart : -1
+  let awaitAt = (this.options.ecmaVersion >= 9 && this.canAwait && this.eatContextual("await")) ? this.lastTokStart : -1
   this.labels.push(loopLabel)
   this.enterScope(0)
   this.expect(tt.parenL)
@@ -233,7 +235,7 @@ pp.parseForStatement = function(node) {
     return this.parseFor(node, init)
   }
   let refDestructuringErrors = new DestructuringErrors
-  let init = this.parseExpression(true, refDestructuringErrors)
+  let init = this.parseExpression(awaitAt > -1 ? "await" : true, refDestructuringErrors)
   if (this.type === tt._in || (this.options.ecmaVersion >= 6 && this.isContextual("of"))) {
     if (this.options.ecmaVersion >= 9) {
       if (this.type === tt._in) {

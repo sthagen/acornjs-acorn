@@ -7,9 +7,10 @@ import {SourceLocation} from "./locutil.js"
 export const defaultOptions = {
   // `ecmaVersion` indicates the ECMAScript version to parse. Must be
   // either 3, 5, 6 (or 2015), 7 (2016), 8 (2017), 9 (2018), 10
-  // (2019), 11 (2020), 12 (2021), or `"latest"` (the latest version
-  // the library supports). This influences support for strict mode,
-  // the set of reserved words, and support for new syntax features.
+  // (2019), 11 (2020), 12 (2021), 13 (2022), or `"latest"` (the
+  // latest version the library supports). This influences support
+  // for strict mode, the set of reserved words, and support for
+  // new syntax features.
   ecmaVersion: null,
   // `sourceType` indicates the mode the code should be parsed in.
   // Can be either `"script"` or `"module"`. This influences global
@@ -36,9 +37,13 @@ export const defaultOptions = {
   // appearing at the top of the program, and an import.meta expression
   // in a script isn't considered an error.
   allowImportExportEverywhere: false,
+  // By default, await identifiers are allowed to appear at the top-level scope only if ecmaVersion >= 2022.
   // When enabled, await identifiers are allowed to appear at the top-level scope,
   // but they are still not allowed in non-async functions.
-  allowAwaitOutsideFunction: false,
+  allowAwaitOutsideFunction: null,
+  // When enabled, super identifiers are not constrained to
+  // appearing in methods and do not raise an error when they appear elsewhere.
+  allowSuperOutsideMethod: null,
   // When enabled, hashbang directive in the beginning of file
   // is allowed and treated as a line comment.
   allowHashBang: false,
