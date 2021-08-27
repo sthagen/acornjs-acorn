@@ -234,14 +234,16 @@ pp.parseForStatement = function(node) {
     if (awaitAt > -1) this.unexpected(awaitAt)
     return this.parseFor(node, init)
   }
+  let startsWithLet = this.isContextual("let"), isForOf = false
   let refDestructuringErrors = new DestructuringErrors
   let init = this.parseExpression(awaitAt > -1 ? "await" : true, refDestructuringErrors)
-  if (this.type === tt._in || (this.options.ecmaVersion >= 6 && this.isContextual("of"))) {
+  if (this.type === tt._in || (isForOf = this.options.ecmaVersion >= 6 && this.isContextual("of"))) {
     if (this.options.ecmaVersion >= 9) {
       if (this.type === tt._in) {
         if (awaitAt > -1) this.unexpected(awaitAt)
       } else node.await = awaitAt > -1
     }
+    if (startsWithLet && isForOf) this.raise(init.start, "The left-hand side of a for-of loop may not start with 'let'.")
     this.toAssignable(init, false, refDestructuringErrors)
     this.checkLValPattern(init)
     return this.parseForIn(node, init)
@@ -519,7 +521,7 @@ const FUNC_STATEMENT = 1, FUNC_HANGING_STATEMENT = 2, FUNC_NULLABLE_ID = 4
 // `statement & FUNC_STATEMENT`).
 
 // Remove `allowExpressionBody` for 7.0.0, as it is only called with false
-pp.parseFunction = function(node, statement, allowExpressionBody, isAsync) {
+pp.parseFunction = function(node, statement, allowExpressionBody, isAsync, forInit) {
   this.initFunction(node)
   if (this.options.ecmaVersion >= 9 || this.options.ecmaVersion >= 6 && !isAsync) {
     if (this.type === tt.star && (statement & FUNC_HANGING_STATEMENT))
@@ -549,7 +551,7 @@ pp.parseFunction = function(node, statement, allowExpressionBody, isAsync) {
     node.id = this.type === tt.name ? this.parseIdent() : null
 
   this.parseFunctionParams(node)
-  this.parseFunctionBody(node, allowExpressionBody, false)
+  this.parseFunctionBody(node, allowExpressionBody, false, forInit)
 
   this.yieldPos = oldYieldPos
   this.awaitPos = oldAwaitPos
@@ -749,7 +751,7 @@ pp.parseClassId = function(node, isStatement) {
 }
 
 pp.parseClassSuper = function(node) {
-  node.superClass = this.eat(tt._extends) ? this.parseExprSubscripts() : null
+  node.superClass = this.eat(tt._extends) ? this.parseExprSubscripts(false) : null
 }
 
 pp.enterClassBody = function() {
