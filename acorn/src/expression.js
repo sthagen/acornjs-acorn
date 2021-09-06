@@ -17,6 +17,7 @@
 // [opp]: http://en.wikipedia.org/wiki/Operator-precedence_parser
 
 import {types as tt} from "./tokentype.js"
+import {types as tokenCtxTypes} from "./tokencontext.js"
 import {Parser} from "./state.js"
 import {DestructuringErrors} from "./parseutil.js"
 import {lineBreak} from "./whitespace.js"
@@ -411,8 +412,10 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
   case tt.name:
     let startPos = this.start, startLoc = this.startLoc, containsEsc = this.containsEsc
     let id = this.parseIdent(false)
-    if (this.options.ecmaVersion >= 8 && !containsEsc && id.name === "async" && !this.canInsertSemicolon() && this.eat(tt._function))
+    if (this.options.ecmaVersion >= 8 && !containsEsc && id.name === "async" && !this.canInsertSemicolon() && this.eat(tt._function)) {
+      this.overrideContext(tokenCtxTypes.f_expr)
       return this.parseFunction(this.startNodeAt(startPos, startLoc), 0, false, true, forInit)
+    }
     if (canBeArrow && !this.canInsertSemicolon()) {
       if (this.eat(tt.arrow))
         return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), [id], false, forInit)
@@ -459,6 +462,7 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     return this.finishNode(node, "ArrayExpression")
 
   case tt.braceL:
+    this.overrideContext(tokenCtxTypes.b_expr)
     return this.parseObj(false, refDestructuringErrors)
 
   case tt._function:
@@ -647,8 +651,8 @@ pp.parseNew = function() {
       this.raiseRecoverable(node.property.start, "The only valid meta property for new is 'new.target'")
     if (containsEsc)
       this.raiseRecoverable(node.start, "'new.target' must not contain escaped characters")
-    if (!this.inNonArrowFunction)
-      this.raiseRecoverable(node.start, "'new.target' can only be used in functions")
+    if (!this.allowNewDotTarget)
+      this.raiseRecoverable(node.start, "'new.target' can only be used in functions and class static block")
     return this.finishNode(node, "MetaProperty")
   }
   let startPos = this.start, startLoc = this.startLoc, isImport = this.type === tt._import
@@ -988,6 +992,8 @@ pp.checkUnreserved = function({start, end, name}) {
     this.raiseRecoverable(start, "Cannot use 'await' as identifier inside an async function")
   if (this.currentThisScope().inClassFieldInit && name === "arguments")
     this.raiseRecoverable(start, "Cannot use 'arguments' in class field initializer")
+  if (this.inClassStaticBlock && (name === "arguments" || name === "await"))
+    this.raise(start, `Cannot use ${name} in class static initialization block`)
   if (this.keywords.test(name))
     this.raise(start, `Unexpected keyword '${name}'`)
   if (this.options.ecmaVersion < 6 &&
