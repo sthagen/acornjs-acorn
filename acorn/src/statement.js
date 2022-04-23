@@ -2,7 +2,7 @@ import {types as tt} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {lineBreak, skipWhiteSpace} from "./whitespace.js"
 import {isIdentifierStart, isIdentifierChar, keywordRelationalOperator} from "./identifier.js"
-import {has} from "./util.js"
+import {hasOwn, loneSurrogate} from "./util.js"
 import {DestructuringErrors} from "./parseutil.js"
 import {functionFlags, SCOPE_SIMPLE_CATCH, BIND_SIMPLE_CATCH, BIND_LEXICAL, BIND_VAR, BIND_FUNCTION, SCOPE_CLASS_STATIC_BLOCK, SCOPE_SUPER} from "./scopeflags.js"
 
@@ -788,7 +788,7 @@ pp.exitClassBody = function() {
   const parent = len === 0 ? null : this.privateNameStack[len - 1]
   for (let i = 0; i < used.length; ++i) {
     const id = used[i]
-    if (!has(declared, id.name)) {
+    if (!hasOwn(declared, id.name)) {
       if (parent) {
         parent.used.push(id)
       } else {
@@ -840,8 +840,8 @@ pp.parseExport = function(node, exports) {
   if (this.eat(tt.star)) {
     if (this.options.ecmaVersion >= 11) {
       if (this.eatContextual("as")) {
-        node.exported = this.parseIdent(true)
-        this.checkExport(exports, node.exported.name, this.lastTokStart)
+        node.exported = this.parseModuleExportName()
+        this.checkExport(exports, node.exported, this.lastTokStart)
       } else {
         node.exported = null
       }
@@ -875,7 +875,7 @@ pp.parseExport = function(node, exports) {
     if (node.declaration.type === "VariableDeclaration")
       this.checkVariableExport(exports, node.declaration.declarations)
     else
-      this.checkExport(exports, node.declaration.id.name, node.declaration.id.start)
+      this.checkExport(exports, node.declaration.id, node.declaration.id.start)
     node.specifiers = []
     node.source = null
   } else { // export { x, y as z } [from '...']
@@ -890,6 +890,10 @@ pp.parseExport = function(node, exports) {
         this.checkUnreserved(spec.local)
         // check if export is defined
         this.checkLocalExport(spec.local)
+
+        if (spec.local.type === "Literal") {
+          this.raise(spec.local.start, "A string literal cannot be used as an exported binding without `from`.")
+        }
       }
 
       node.source = null
@@ -901,7 +905,9 @@ pp.parseExport = function(node, exports) {
 
 pp.checkExport = function(exports, name, pos) {
   if (!exports) return
-  if (has(exports, name))
+  if (typeof name !== "string")
+    name = name.type === "Identifier" ? name.name : name.value
+  if (hasOwn(exports, name))
     this.raiseRecoverable(pos, "Duplicate export '" + name + "'")
   exports[name] = true
 }
@@ -909,7 +915,7 @@ pp.checkExport = function(exports, name, pos) {
 pp.checkPatternExport = function(exports, pat) {
   let type = pat.type
   if (type === "Identifier")
-    this.checkExport(exports, pat.name, pat.start)
+    this.checkExport(exports, pat, pat.start)
   else if (type === "ObjectPattern")
     for (let prop of pat.properties)
       this.checkPatternExport(exports, prop)
@@ -955,9 +961,13 @@ pp.parseExportSpecifiers = function(exports) {
     } else first = false
 
     let node = this.startNode()
-    node.local = this.parseIdent(true)
-    node.exported = this.eatContextual("as") ? this.parseIdent(true) : node.local
-    this.checkExport(exports, node.exported.name, node.exported.start)
+    node.local = this.parseModuleExportName()
+    node.exported = this.eatContextual("as") ? this.parseModuleExportName() : node.local
+    this.checkExport(
+      exports,
+      node.exported,
+      node.exported.start
+    )
     nodes.push(this.finishNode(node, "ExportSpecifier"))
   }
   return nodes
@@ -1009,7 +1019,7 @@ pp.parseImportSpecifiers = function() {
     } else first = false
 
     let node = this.startNode()
-    node.imported = this.parseIdent(true)
+    node.imported = this.parseModuleExportName()
     if (this.eatContextual("as")) {
       node.local = this.parseIdent()
     } else {
@@ -1020,6 +1030,17 @@ pp.parseImportSpecifiers = function() {
     nodes.push(this.finishNode(node, "ImportSpecifier"))
   }
   return nodes
+}
+
+pp.parseModuleExportName = function() {
+  if (this.options.ecmaVersion >= 13 && this.type === tt.string) {
+    const stringLiteral = this.parseLiteral(this.value)
+    if (loneSurrogate.test(stringLiteral.value)) {
+      this.raise(stringLiteral.start, "An export name cannot include a lone surrogate.")
+    }
+    return stringLiteral
+  }
+  return this.parseIdent(true)
 }
 
 // Set `ExpressionStatement#directive` property for directive prologues.

@@ -29,7 +29,7 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-if (typeof exports != "undefined") {
+if (typeof exports !== "undefined") {
   var test = require("./driver.js").test;
   var testFail = require("./driver.js").testFail;
 }
@@ -14847,6 +14847,7 @@ testFail("class A { set prop(x, y) {} }", "setter should have exactly one param 
 
 testFail("({ __proto__: 1, __proto__: 2 })", "Redefinition of __proto__ property (1:17)", {ecmaVersion: 6});
 testFail("({ '__proto__': 1, __proto__: 2 })", "Redefinition of __proto__ property (1:19)", {ecmaVersion: 6});
+testFail("({ '__proto__': 1, __proto__: 2, a: x = 1 })", "Redefinition of __proto__ property (1:19)", {ecmaVersion: 6});
 test("({ ['__proto__']: 1, __proto__: 2 })", {}, {ecmaVersion: 6});
 test("({ __proto__() { return 1 }, __proto__: 2 })", {}, {ecmaVersion: 6});
 test("({ get __proto__() { return 1 }, __proto__: 2 })", {}, {ecmaVersion: 6});
@@ -16517,6 +16518,9 @@ test("({ __proto__: x, __proto__: y, __proto__: z }) => {}", {}, {ecmaVersion: 6
 // Don't parse first token after a class or strict function as strict
 test("class x {}\n05", {}, {ecmaVersion: 6})
 test("function x() { 'use strict' }\n05", {}, {ecmaVersion: 6})
+
+// Ignore strict directives before ES5
+test("'use strict'; '\\02'", {}, {ecmaVersion: 3})
 
 test("const myFn = ({ set = '' }) => {};", {
   "type": "Program",

@@ -46,10 +46,12 @@ pp.checkPropClash = function(prop, propHash, refDestructuringErrors) {
     if (name === "__proto__" && kind === "init") {
       if (propHash.proto) {
         if (refDestructuringErrors) {
-          if (refDestructuringErrors.doubleProto < 0)
+          if (refDestructuringErrors.doubleProto < 0) {
             refDestructuringErrors.doubleProto = key.start
-          // Backwards-compat kludge. Can be removed in version 6.0
-        } else this.raiseRecoverable(key.start, "Redefinition of __proto__ property")
+          }
+        } else {
+          this.raiseRecoverable(key.start, "Redefinition of __proto__ property")
+        }
       }
       propHash.proto = true
     }
@@ -114,10 +116,11 @@ pp.parseMaybeAssign = function(forInit, refDestructuringErrors, afterLeftParse) 
     else this.exprAllowed = false
   }
 
-  let ownDestructuringErrors = false, oldParenAssign = -1, oldTrailingComma = -1
+  let ownDestructuringErrors = false, oldParenAssign = -1, oldTrailingComma = -1, oldDoubleProto = -1
   if (refDestructuringErrors) {
     oldParenAssign = refDestructuringErrors.parenthesizedAssign
     oldTrailingComma = refDestructuringErrors.trailingComma
+    oldDoubleProto = refDestructuringErrors.doubleProto
     refDestructuringErrors.parenthesizedAssign = refDestructuringErrors.trailingComma = -1
   } else {
     refDestructuringErrors = new DestructuringErrors
@@ -148,6 +151,7 @@ pp.parseMaybeAssign = function(forInit, refDestructuringErrors, afterLeftParse) 
     node.left = left
     this.next()
     node.right = this.parseMaybeAssign(forInit)
+    if (oldDoubleProto > -1) refDestructuringErrors.doubleProto = oldDoubleProto
     return this.finishNode(node, "AssignmentExpression")
   } else {
     if (ownDestructuringErrors) this.checkExpressionErrors(refDestructuringErrors, true)
@@ -634,7 +638,7 @@ pp.parseParenItem = function(item) {
 }
 
 pp.parseParenArrowList = function(startPos, startLoc, exprList, forInit) {
-  return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), exprList, forInit)
+  return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), exprList, false, forInit)
 }
 
 // New's precedence is slightly tricky. It must allow its argument to

@@ -1,8 +1,7 @@
 
-if (typeof exports != "undefined") {
+if (typeof exports !== "undefined") {
   var driver = require("./driver.js");
   var test = driver.test, testFail = driver.testFail;
-  var acorn = require("../acorn");
 }
 
 //------------------------------------------------------------------------------
@@ -84,6 +83,19 @@ test("export * from \"source\"", {
   ],
   "sourceType": "module"
 }, { sourceType: "module", ecmaVersion: 11 })
+
+test("export * from 'a';", {
+  type: "Program",
+  body: [
+    {
+      type: "ExportAllDeclaration",
+      exported: null,
+      source: {
+        type: "Literal",
+      }
+    }
+  ]
+}, {sourceType: "module", ecmaVersion: 11})
 
 testFail("export * as ns from \"source\"", "'import' and 'export' may appear only with 'sourceType: module' (1:0)", { sourceType: "script", ecmaVersion: 11 })
 testFail("export * as ns from \"source\"", "Unexpected token (1:9)", { sourceType: "module", ecmaVersion: 10 })

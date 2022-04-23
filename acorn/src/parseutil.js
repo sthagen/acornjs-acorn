@@ -8,6 +8,7 @@ const pp = Parser.prototype
 
 const literal = /^(?:'((?:\\.|[^'\\])*?)'|"((?:\\.|[^"\\])*?)")/
 pp.strictDirective = function(start) {
+  if (this.options.ecmaVersion < 5) return false
   for (;;) {
     // Try to find string literal.
     skipWhiteSpace.lastIndex = start
@@ -110,13 +111,15 @@ pp.unexpected = function(pos) {
   this.raise(pos != null ? pos : this.start, "Unexpected token")
 }
 
-export function DestructuringErrors() {
-  this.shorthandAssign =
-  this.trailingComma =
-  this.parenthesizedAssign =
-  this.parenthesizedBind =
-  this.doubleProto =
-    -1
+export class DestructuringErrors {
+  constructor() {
+    this.shorthandAssign =
+    this.trailingComma =
+    this.parenthesizedAssign =
+    this.parenthesizedBind =
+    this.doubleProto =
+      -1
+  }
 }
 
 pp.checkPatternErrors = function(refDestructuringErrors, isAssign) {
