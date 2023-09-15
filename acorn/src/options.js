@@ -16,11 +16,11 @@ export const defaultOptions = {
   // Can be either `"script"` or `"module"`. This influences global
   // strict mode and parsing of `import` and `export` declarations.
   sourceType: "script",
-  // `onInsertedSemicolon` can be a callback that will be called
-  // when a semicolon is automatically inserted. It will be passed
-  // the position of the comma as an offset, and if `locations` is
-  // enabled, it is given the location as a `{line, column}` object
-  // as second argument.
+  // `onInsertedSemicolon` can be a callback that will be called when
+  // a semicolon is automatically inserted. It will be passed the
+  // position of the inserted semicolon as an offset, and if
+  // `locations` is enabled, it is given the location as a `{line,
+  // column}` object as second argument.
   onInsertedSemicolon: null,
   // `onTrailingComma` is similar to `onInsertedSemicolon`, but for
   // trailing commas.
@@ -73,6 +73,8 @@ export const defaultOptions = {
   // passed, the full `{line, column}` locations of the start and
   // end of the comments. Note that you are not allowed to call the
   // parser from the callback—that will corrupt its internal state.
+  // When this option has an array as value, objects representing the
+  // comments are pushed to it.
   onComment: null,
   // Nodes have their start and end characters offsets recorded in
   // `start` and `end` properties (directly on the node, rather than
