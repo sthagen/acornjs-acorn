@@ -1,3 +1,15 @@
+## 8.11.2 (2023-10-27)
+
+### Bug fixes
+
+Fix a bug that caused regular expressions after colon tokens to not be properly tokenized in some circumstances.
+
+## 8.11.1 (2023-10-26)
+
+### Bug fixes
+
+Fix a regression where `onToken` would receive 'name' tokens for 'new' keyword tokens.
+
 ## 8.11.0 (2023-10-26)
 
 ### Bug fixes
