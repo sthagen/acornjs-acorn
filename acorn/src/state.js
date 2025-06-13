@@ -83,7 +83,12 @@ export class Parser {
 
     // Scope tracking for duplicate variable names (see scope.js)
     this.scopeStack = []
-    this.enterScope(SCOPE_TOP)
+    this.enterScope(
+      this.options.sourceType === "commonjs"
+        // In commonjs, the top-level scope behaves like a function scope
+        ? SCOPE_FUNCTION
+        : SCOPE_TOP
+    )
 
     // For RegExp validation
     this.regexpState = null
@@ -113,6 +118,12 @@ export class Parser {
       if (flags & SCOPE_FUNCTION) return (flags & SCOPE_ASYNC) > 0
     }
     return (this.inModule && this.options.ecmaVersion >= 13) || this.options.allowAwaitOutsideFunction
+  }
+
+  get allowReturn() {
+    if (this.inFunction) return true
+    if (this.options.allowReturnOutsideFunction && this.currentVarScope().flags & SCOPE_TOP) return true
+    return false
   }
 
   get allowSuper() {

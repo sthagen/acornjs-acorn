@@ -27,7 +27,7 @@ pp.parseTopLevel = function(node) {
       this.raiseRecoverable(this.undefinedExports[name].start, `Export '${name}' is not defined`)
   this.adaptDirectivePrologue(node.body)
   this.next()
-  node.sourceType = this.options.sourceType
+  node.sourceType = this.options.sourceType === "commonjs" ? "script" : this.options.sourceType
   return this.finishNode(node, "Program")
 }
 
@@ -356,7 +356,7 @@ pp.parseIfStatement = function(node) {
 }
 
 pp.parseReturnStatement = function(node) {
-  if (!this.inFunction && !this.options.allowReturnOutsideFunction)
+  if (!this.allowReturn)
     this.raise(this.start, "'return' outside of function")
   this.next()
 
